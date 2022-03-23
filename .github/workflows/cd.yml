@@ -8,8 +8,24 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: Set Node.js 16
+      uses: actions/setup-node@v1
+      with:
+        version: 16.x
+    - name: Install npm modules
+      run: npm ci
+    - name: Build CSS
+      run: npm run build
+
   deploy:
     runs-on: ubuntu-latest
+    needs: build
+    if: github.ref == 'refs/heads/main'
     steps:
     - name: Create Deployment
       uses: bobheadxi/deployments@v0.6.2
@@ -18,8 +34,6 @@ jobs:
         step: start
         token: ${{ github.token }}
         env: aws
-
-    - uses: actions/checkout@v2
 
     ## means s3 sync will only sync things we need sync’d
     - uses: chetan/git-restore-mtime-action@v1
@@ -33,7 +47,7 @@ jobs:
     # cache-control of 10 mins because we *need* to be able to update
     # this and have people see the results can be fixed well with a static site builder
     - run: |
-        aws s3 sync . s3://www.tea.xyz \
+        aws s3 sync public s3://www.tea.xyz \
           --metadata-directive REPLACE \
           --cache-control max-age=600 \
           --exclude '.git/*' --exclude '.github/*' \
